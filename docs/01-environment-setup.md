@@ -11,7 +11,7 @@
 ### Required Items
 - [ ] RunPod account (https://runpod.io/)
 - [ ] Credit card or credits (for GPU Pod usage)
-- [ ] Hugging Face account (for RMBG model download)
+- [ ] Hugging Face account (optional, for manual model download)
 
 ### Recommended Specifications
 - **GPU:** NVIDIA RTX 4000 Ada or higher
@@ -31,12 +31,15 @@
 **Template Features:**
 ```yaml
 Image: runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04 
-Includes:
-  - ComfyUI (pre-installed)
-  - Python 3.10 + PyTorch
-  - CUDA 11.8
+Pre-installed:
+  - ComfyUI (ready to use)
+  - ComfyUI Manager (pre-installed) ✅
+  - Python 3.11 + PyTorch 2.4
+  - CUDA 12.4
   - Jupyter Lab
 ```
+
+**✨ Important:** This template includes ComfyUI Manager by default, so you don't need to install it separately!
 
 ### 1-2. Select GPU
 
@@ -109,12 +112,24 @@ cd /workspace/ComfyUI
 ls -la
 
 # Expected output:
-# custom_nodes/
+# custom_nodes/  (includes ComfyUI-Manager)
 # models/
 # output/
 # main.py
 # ...
 ```
+
+### 2-4. Verify ComfyUI Manager (Pre-installed)
+
+```bash
+# Check if ComfyUI Manager is installed
+ls /workspace/ComfyUI/custom_nodes/ | grep Manager
+
+# Expected output:
+# ComfyUI-Manager
+```
+
+**✅ ComfyUI Manager is already installed!** No need to install manually.
 
 ---
 
@@ -171,56 +186,70 @@ source ~/.bashrc
 
 ---
 
-## 🤖 Step 4: Install RMBG-2.0 Model
+## 🤖 Step 4: Install RMBG-2.0 Custom Node
 
-### 4-1. Install ComfyUI Manager
-
-```bash
-cd /workspace/ComfyUI/custom_nodes
-
-# Clone ComfyUI Manager
-git clone https://github.com/ltdrdata/ComfyUI-Manager.git
-```
-
-### 4-2. Install RMBG Node
-
-**Option 1: Via ComfyUI Manager (Recommended)**
-
-1. Start ComfyUI:
-   ```bash
-   cd /workspace/ComfyUI
-   python main.py --listen --port 8188
-   ```
-
-2. Access in browser:
-   ```
-   http://[POD-IP]:[EXTERNAL-PORT]/
-   ```
-
-3. Click **Manager** button
-
-4. Select **"Install Custom Nodes"**
-
-5. Search: `RMBG`
-
-6. Install **"ComfyUI-RMBG"**
-
-**Option 2: Manual Installation**
+### 4-1. Start ComfyUI
 
 ```bash
-cd /workspace/ComfyUI/custom_nodes
-git clone https://github.com/ZHO-ZHO-ZHO/ComfyUI-RMBG.git
-cd ComfyUI-RMBG
-pip install -r requirements.txt
+cd /workspace/ComfyUI
+python main.py --listen --port 8188
 ```
 
-### 4-3. Download RMBG-2.0 Model
+**Expected Output:**
+```
+Total VRAM 20147 MB, total RAM 257588 MB
+Device: cuda:0 NVIDIA RTX 4000 Ada Generation
+Starting server...
+To see the GUI go to: http://0.0.0.0:8188
+```
 
-**Automatic Download (Recommended):**
+### 4-2. Access ComfyUI in Browser
 
-Model downloads automatically on first use when running ComfyUI.
+1. In RunPod Dashboard, click **"Connect"**
+2. Select **"HTTP Service [8188]"**
+3. ComfyUI UI opens in browser
 
-**Manual Download:**
+### 4-3. Install RMBG Node via ComfyUI Manager
+
+**Using Pre-installed ComfyUI Manager:**
+
+1. In ComfyUI UI, click **"Manager"** button (bottom right or side panel)
+
+2. Click **"Install Custom Nodes"**
+
+3. In the search box, type: `RMBG`
+
+4. Find **"ComfyUI-RMBG"** or **"ComfyUI-BRIA_AI-RMBG"**
+
+5. Click **"Install"** button
+
+6. Wait for installation (30 seconds - 1 minute)
+
+7. Click **"Restart"** button when prompted
+
+**⚠️ Important:** ComfyUI will restart automatically. Wait 10-20 seconds, then refresh your browser.
+
+### 4-4. Verify RMBG Node Installation
+
+After restart:
+
+1. Right-click on the canvas → **"Add Node"**
+
+2. Navigate to: **"image"** → **"postprocessing"**
+
+3. Look for: **"RMBG Remove Background"** or similar node
+
+**✅ Success if you see the RMBG node!**
+
+### 4-5. Model Download (Automatic)
+
+**The RMBG model will download automatically on first use!**
+
+- Model: RMBG-2.0 (approximately 176MB)
+- Location: `/workspace/ComfyUI/models/rmbg/`
+- Download happens when you first run a workflow with the RMBG node
+
+**Manual Download (Optional):**
 
 ```bash
 # Install Hugging Face CLI
@@ -230,12 +259,6 @@ pip install huggingface_hub
 huggingface-cli download briaai/RMBG-2.0 \
   --local-dir /workspace/ComfyUI/models/rmbg \
   --local-dir-use-symlinks False
-```
-
-**Verify Model Location:**
-```bash
-ls -lh /workspace/ComfyUI/models/rmbg/
-# Output: model.pth (approximately 176MB)
 ```
 
 ---
@@ -248,24 +271,17 @@ ls -lh /workspace/ComfyUI/models/rmbg/
 cat > /workspace/run_gpu.sh << 'EOF'
 #!/bin/bash
 
-echo "🚀 Starting ComfyUI Background Removal WebApp Setup..."
+echo "🚀 Starting ComfyUI Background Removal WebApp..."
 
-# Install NVM (if not exists)
-if [ ! -d "$HOME/.nvm" ]; then
-  echo "📦 Installing NVM..."
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-fi
-
-# Load NVM
+# Load NVM (if installed)
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-# Install Node.js 20 (if not exists)
+# Verify Node.js
 if ! command -v node &> /dev/null; then
-  echo "📦 Installing Node.js 20 LTS..."
-  nvm install 20
-  nvm use 20
-  nvm alias default 20
+  echo "⚠️  Node.js not found! Please install Node.js first."
+  echo "Run: nvm install 20 && nvm use 20"
+  exit 1
 fi
 
 echo "✅ Node.js version: $(node --version)"
@@ -291,7 +307,7 @@ chmod +x /workspace/run_gpu.sh
 
 **Expected Output:**
 ```
-🚀 Starting ComfyUI Background Removal WebApp Setup...
+🚀 Starting ComfyUI Background Removal WebApp...
 ✅ Node.js version: v20.11.1
 ✅ npm version: 10.5.0
 🎨 Starting ComfyUI on port 8188...
@@ -334,7 +350,7 @@ npm --version   # 10.x.x
 In ComfyUI:
 1. Right-click → **"Add Node"**
 2. Go to **"image/postprocessing"** or search `RMBG`
-3. Success if **"RMBG-2.0"** node appears!
+3. Success if **"RMBG Remove Background"** node appears!
 
 ---
 
@@ -345,8 +361,9 @@ In ComfyUI:
 - [x] RunPod GPU Pod created
 - [x] Network Volume mounted
 - [x] ComfyUI running properly
+- [x] ComfyUI Manager verified (pre-installed)
 - [x] Node.js 20 LTS installed
-- [x] RMBG-2.0 model installed
+- [x] RMBG-2.0 custom node installed
 - [x] Startup script created
 
 ### Next Steps
@@ -368,12 +385,13 @@ In ComfyUI:
 - No need to reinstall Node.js
 - ComfyUI settings preserved
 - Models don't need re-downloading
+- Custom nodes remain installed
 
 ### Cost Optimization Tips
 
 1. **Stop Pod When Not in Use**
    ```
-   Stop Pod → Only storage costs apply
+   Stop Pod → Only storage costs apply (~$0.10/GB/month)
    ```
 
 2. **Use Spot Instances**
@@ -393,8 +411,8 @@ In ComfyUI:
 # Check processes
 ps aux | grep python
 
-# Check port
-netstat -tlnp | grep 8188
+# Check port (using ss command)
+ss -tlnp | grep 8188
 
 # Check logs
 tail -f /workspace/ComfyUI/comfyui.log
@@ -405,6 +423,53 @@ tail -f /workspace/ComfyUI/comfyui.log
 # Reinstall NVM
 rm -rf ~/.nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install 20
+```
+
+**RMBG Node Not Showing:**
+```bash
+# Restart ComfyUI
+# In ComfyUI Manager, click "Restart"
+# Or manually:
+pkill -f 'python.*main.py'
+/workspace/run_gpu.sh
+```
+
+**Model Download Failed:**
+```bash
+# Check models directory
+ls -lh /workspace/ComfyUI/models/rmbg/
+
+# Manual download
+pip install huggingface_hub
+huggingface-cli download briaai/RMBG-2.0 \
+  --local-dir /workspace/ComfyUI/models/rmbg
+```
+
+---
+
+## 📚 Additional Resources
+
+### Official Documentation
+- [ComfyUI GitHub](https://github.com/comfyanonymous/ComfyUI)
+- [ComfyUI Manager](https://github.com/ltdrdata/ComfyUI-Manager)
+- [RMBG-2.0 Model](https://huggingface.co/briaai/RMBG-2.0)
+- [RunPod Documentation](https://docs.runpod.io/)
+
+### Useful Commands
+```bash
+# Stop ComfyUI
+pkill -f 'python.*main.py'
+
+# View ComfyUI logs in real-time
+tail -f /workspace/ComfyUI/comfyui.log
+
+# Check GPU usage
+nvidia-smi
+
+# Check disk usage
+df -h /workspace
 ```
 
 ---
